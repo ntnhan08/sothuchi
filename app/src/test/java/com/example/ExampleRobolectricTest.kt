@@ -16,7 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [34])
 class ExampleRobolectricTest {
 
   @get:Rule val composeTestRule = createComposeRule()
@@ -48,8 +48,15 @@ class ExampleRobolectricTest {
     // Confirm the dialog
     composeTestRule.onNodeWithTag("confirm_budget_button").performClick()
 
-    // Wait and check if remaining balance displays matching value (15.000.000 ₫)
-    composeTestRule.onNodeWithText("15.000.000 ₫").assertExists()
+    // Wait until the remaining balance displays matching value (15.000.000 ₫)
+    composeTestRule.waitUntil(5000) {
+      try {
+        composeTestRule.onNodeWithText("15.000.000 ₫").assertExists()
+        true
+      } catch (e: AssertionError) {
+        false
+      }
+    }
   }
 
   @Test
