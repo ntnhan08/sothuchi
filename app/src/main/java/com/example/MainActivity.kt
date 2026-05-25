@@ -1,6 +1,7 @@
 package com.example
 
 import android.os.Bundle
+import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -27,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -40,6 +42,7 @@ import com.example.data.model.Transaction
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.FinanceUiState
 import com.example.ui.viewmodel.FinanceViewModel
+import com.example.ui.viewmodel.FinanceViewModelFactory
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -88,7 +91,11 @@ fun formatDate(timestamp: Long): String {
 }
 
 @Composable
-fun BudgetApp(viewModel: FinanceViewModel = viewModel()) {
+fun BudgetApp() {
+    val context = LocalContext.current
+    val viewModel: FinanceViewModel = viewModel(
+        factory = FinanceViewModelFactory(context.applicationContext as Application)
+    )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     var showAddDialog by remember { mutableStateOf(false) }

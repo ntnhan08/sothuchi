@@ -8,7 +8,7 @@ import com.example.data.dao.FinanceDao
 import com.example.data.model.BudgetConfig
 import com.example.data.model.Transaction
 
-@Database(entities = [Transaction::class, BudgetConfig::class], version = 1, exportSchema = false)
+@Database(entities = [Transaction::class, BudgetConfig::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
 
