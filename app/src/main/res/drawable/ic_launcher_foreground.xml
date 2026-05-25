@@ -1,0 +1,48 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Background circle highlight inside vector -->
+    <path
+        android:fillColor="#151E1C"
+        android:pathData="M54,54m-33,0a33,33 0,1 1,66 0a33,33 0,1 1,-66 0" />
+
+    <!-- Wallet shape in emerald/gold theme -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M32,42 C32,39 34,37 37,37 L71,37 C74,37 76,39 76,42 L76,68 C76,71 74,73 71,73 L37,73 C34,73 32,71 32,68 Z" />
+
+    <!-- Wallet pocket/crease -->
+    <path
+        android:fillColor="#FFA726"
+        android:pathData="M32,48 L76,48 L76,42 C76,39 74,37 71,37 L37,37 C34,37 32,39 32,42 Z" />
+
+    <!-- Wallet lock/strap -->
+    <path
+        android:fillColor="#81C784"
+        android:pathData="M60,52 C57,52 55,54 55,57 L55,63 C55,66 57,68 60,68 L76,68 L76,52 Z" />
+
+    <!-- Silver clasp button -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M64,60a3,3 0,1 1,6 0a3,3 0,1 1,-6 0" />
+
+    <!-- Gold coins overlapping -->
+    <!-- Coin 1 (Left-back) -->
+    <path
+        android:fillColor="#FFE082"
+        android:pathData="M43,33m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0" />
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M43,33m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
+
+    <!-- Coin 2 (Right-front) -->
+    <path
+        android:fillColor="#FFF59D"
+        android:pathData="M54,27m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0" />
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M54,27m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
+</vector>

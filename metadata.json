@@ -1,0 +1,6 @@
+{
+  "name": "Sổ Thu Chi",
+  "description": "Ứng dụng giúp bạn kiểm soát chi tiêu cá nhân bằng cách quản lý tiền hiện có, ghi nhận mọi khoản chi tiêu và tổng hợp báo cáo trực quan tức thì.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
