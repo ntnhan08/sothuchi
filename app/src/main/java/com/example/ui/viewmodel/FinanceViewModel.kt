@@ -18,6 +18,7 @@ data class FinanceUiState(
     val transactions: List<Transaction> = emptyList(),
     val budgetConfig: BudgetConfig = BudgetConfig(currentFunds = 0.0),
     val totalExpenses: Double = 0.0,
+    val totalFunds: Double = 0.0,
     val remainingBalance: Double = 0.0
 )
 
@@ -36,12 +37,15 @@ class FinanceViewModel(context: Context) : ViewModel() {
             repository.budgetConfig
         ) { transactionList, config ->
             val totalExpenses = transactionList.filter { it.isExpense }.sumOf { it.amount }
-            val currentFunds = config?.currentFunds ?: 0.0
-            val remainingBalance = currentFunds - totalExpenses
+            val totalIncome = transactionList.filter { !it.isExpense }.sumOf { it.amount }
+            val baseFunds = config?.currentFunds ?: 0.0
+            val totalFunds = baseFunds + totalIncome
+            val remainingBalance = totalFunds - totalExpenses
             FinanceUiState(
                 transactions = transactionList,
-                budgetConfig = config ?: BudgetConfig(currentFunds = 0.0),
+                budgetConfig = config ?: BudgetConfig(currentFunds = baseFunds),
                 totalExpenses = totalExpenses,
+                totalFunds = totalFunds,
                 remainingBalance = remainingBalance
             )
         }.stateIn(

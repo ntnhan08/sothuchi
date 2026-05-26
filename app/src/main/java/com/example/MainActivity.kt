@@ -7,9 +7,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -85,9 +87,42 @@ data class CategoryUi(
 )
 
 // Currency helpers
+val vndFormatSymbols = java.text.DecimalFormatSymbols(Locale.US).apply {
+    groupingSeparator = '.'
+}
+val vndFormatter = DecimalFormat("#,###", vndFormatSymbols)
+
 fun formatVnd(amount: Double): String {
-    val formatter = DecimalFormat("#,###")
-    return formatter.format(amount).replace(",", ".") + " ₫"
+    return try {
+        synchronized(vndFormatter) {
+            vndFormatter.format(amount) + " ₫"
+        }
+    } catch (e: Exception) {
+        "0 ₫"
+    }
+}
+
+fun formatInputString(str: String): String {
+    return try {
+        val cleanStr = str.replace(".", "").replace(",", "")
+        if (cleanStr.isEmpty()) return ""
+        val parsed = cleanStr.toLongOrNull() ?: return str // Return original if not parseable
+        synchronized(vndFormatter) {
+            vndFormatter.format(parsed)
+        }
+    } catch (e: Exception) {
+        str
+    }
+}
+
+fun formatInputStringOptimized(str: String, currentValue: String): String {
+    val formatted = formatInputString(str)
+    return if (formatted == currentValue) currentValue else formatted
+}
+
+fun parseFormattedInput(str: String): Double {
+    val cleanStr = str.replace(".", "").replace(",", "")
+    return cleanStr.toDoubleOrNull() ?: 0.0
 }
 
 fun formatDate(timestamp: Long): String {
@@ -186,11 +221,13 @@ fun BudgetApp() {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Transaction History list
-                TransactionsLedgerSection(
-                    uiState = uiState,
-                    selectedFilter = selectedCategoryFilter,
-                    onDeleteTransaction = { id -> viewModel.deleteTransaction(id) }
-                )
+                Box(modifier = Modifier.weight(1f)) {
+                    TransactionsLedgerSection(
+                        uiState = uiState,
+                        selectedFilter = selectedCategoryFilter,
+                        onDeleteTransaction = { id -> viewModel.deleteTransaction(id) }
+                    )
+                }
             }
         }
 
@@ -236,34 +273,51 @@ fun HeaderSection() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
+            .padding(top = 8.dp, bottom = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column {
             Text(
                 text = "SỔ THU CHI",
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
-                color = MaterialTheme.colorScheme.primary,
-                letterSpacing = 0.5.sp
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.sp
+                ),
+                color = MaterialTheme.colorScheme.primary
             )
-            Text(
-                text = "Kiểm soát chi tiêu thông minh",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Bản cao cấp ",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                )
+                Text(
+                    text = "• by EYECORE LABS",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
+                )
+            }
         }
 
         Surface(
             modifier = Modifier.size(40.dp),
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.secondaryContainer
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = Icons.Default.AccountBalanceWallet,
                     contentDescription = "User wallet",
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -276,24 +330,12 @@ fun SummaryCardSection(
     uiState: FinanceUiState,
     onEditBudgetClicked: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "SummaryCardPulse")
-    val animatedOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1200f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(12000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "gradientPulse"
-    )
     val movingGradient = Brush.linearGradient(
         colors = listOf(
             MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
             MaterialTheme.colorScheme.tertiary.copy(alpha = 0.08f),
             MaterialTheme.colorScheme.secondary.copy(alpha = 0.16f)
-        ),
-        start = androidx.compose.ui.geometry.Offset(animatedOffset, 0f),
-        end = androidx.compose.ui.geometry.Offset(animatedOffset + 800f, 800f)
+        )
     )
 
     Card(
@@ -301,12 +343,23 @@ fun SummaryCardSection(
             .fillMaxWidth()
             .springClickable { onEditBudgetClicked() }
             .background(movingGradient, shape = RoundedCornerShape(24.dp))
+            .border(
+                1.dp,
+                Brush.horizontalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f),
+                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f)
+                    )
+                ),
+                shape = RoundedCornerShape(24.dp)
+            )
             .testTag("budget_setting_card_button"),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.Transparent
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier.padding(20.dp)
@@ -386,7 +439,7 @@ fun SummaryCardSection(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     AnimatedVndText(
-                        amount = uiState.budgetConfig.currentFunds,
+                        amount = uiState.totalFunds,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onBackground
                     )
@@ -554,11 +607,24 @@ fun FilterChipsSection(
     ) {
         items(filters) { filter ->
             val isSelected = filter == selectedFilter
+            val scale by animateFloatAsState(
+                targetValue = if (isSelected) 1.06f else 1.0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                label = "ChipScale"
+            )
             FilterChip(
                 selected = isSelected,
                 onClick = { onFilterSelected(filter) },
                 label = { Text(text = filter) },
-                modifier = Modifier.testTag("filter_${filter.lowercase().replace(" ", "_")}_chip"),
+                modifier = Modifier
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                    .testTag("filter_${filter.lowercase().replace(" ", "_")}_chip"),
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -803,7 +869,7 @@ fun SetBudgetDialog(
     onDismiss: () -> Unit,
     onConfirm: (Double) -> Unit
 ) {
-    var budgetInput by remember { mutableStateOf(if (currentBudget > 0) currentBudget.toInt().toString() else "") }
+    var budgetInput by remember { mutableStateOf(if (currentBudget > 0) formatInputString(currentBudget.toLong().toString()) else "") }
     var showError by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -826,15 +892,16 @@ fun SetBudgetDialog(
 
                 OutlinedTextField(
                     value = budgetInput,
-                    onValueChange = {
-                        if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                            budgetInput = it
+                    onValueChange = { input ->
+                        val cleanInput = input.replace(".", "").replace(",", "")
+                        if (cleanInput.isEmpty() || cleanInput.all { char -> char.isDigit() }) {
+                            budgetInput = formatInputStringOptimized(cleanInput, budgetInput)
                             showError = false
                         }
                     },
                     label = { Text("Số tiền đang có (đ)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    placeholder = { Text("Ví dụ: 5000000") },
+                    placeholder = { Text("Ví dụ: 5.000.000") },
                     singleLine = true,
                     isError = showError,
                     modifier = Modifier
@@ -882,21 +949,38 @@ fun SetBudgetDialog(
                     items(presets) { preset ->
                         AssistChip(
                             onClick = {
-                                val currentVal = budgetInput.toDoubleOrNull() ?: 0.0
-                                budgetInput = (currentVal + preset.value).toLong().toString()
+                                val currentVal = parseFormattedInput(budgetInput)
+                                budgetInput = formatInputString((currentVal + preset.value).toLong().toString())
                                 showError = false
                             },
                             label = { Text(preset.label) }
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "by EYECORE LABS",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    val amount = budgetInput.toDoubleOrNull()
-                    if (amount != null && amount >= 0) {
+                    val amount = parseFormattedInput(budgetInput)
+                    if (amount >= 0) {
                         onConfirm(amount)
                     } else {
                         showError = true
@@ -1014,14 +1098,15 @@ fun AddTransactionDialog(
                 // Numerical price / amount
                 OutlinedTextField(
                     value = amountText,
-                    onValueChange = {
-                        if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                            amountText = it
-                            if (it.isNotEmpty()) amountError = false
+                    onValueChange = { input ->
+                        val cleanInput = input.replace(".", "").replace(",", "")
+                        if (cleanInput.isEmpty() || cleanInput.all { char -> char.isDigit() }) {
+                            amountText = formatInputStringOptimized(cleanInput, amountText)
+                            if (cleanInput.isNotEmpty()) amountError = false
                         }
                     },
                     label = { Text("Số tiền (đ)") },
-                    placeholder = { Text("Ví dụ: 35000") },
+                    placeholder = { Text("Ví dụ: 35.000") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     isError = amountError,
@@ -1079,24 +1164,41 @@ fun AddTransactionDialog(
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "by EYECORE LABS",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    val finalAmount = amountText.toDoubleOrNull()
+                    val finalAmount = parseFormattedInput(amountText)
                     var isVal = true
 
                     if (title.isBlank()) {
                         titleError = true
                         isVal = false
                     }
-                    if (finalAmount == null || finalAmount <= 0) {
+                    if (finalAmount <= 0) {
                         amountError = true
                         isVal = false
                     }
 
-                    if (isVal && finalAmount != null) {
+                    if (isVal) {
                         onConfirm(title, finalAmount, selectedCategory, isExpense)
                     }
                 },
@@ -1136,22 +1238,6 @@ fun ConfettiOverlay(
     onAnimationFinished: () -> Unit
 ) {
     if (particles.isEmpty()) return
-
-    val isTesting = remember {
-        try {
-            Class.forName("org.robolectric.Robolectric")
-            true
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    if (isTesting) {
-        LaunchedEffect(Unit) {
-            onAnimationFinished()
-        }
-        return
-    }
 
     val animatable = remember { Animatable(0f) }
 
@@ -1233,35 +1319,8 @@ fun AnimatedVndText(
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified
 ) {
-    val isTesting = remember {
-        try {
-            Class.forName("org.robolectric.Robolectric")
-            true
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    if (isTesting) {
-        Text(
-            text = formatVnd(amount),
-            style = style,
-            color = color,
-            modifier = modifier
-        )
-        return
-    }
-
-    val animatedAmount by animateFloatAsState(
-        targetValue = amount.toFloat(),
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "VndAmountAnimation"
-    )
     Text(
-        text = formatVnd(animatedAmount.toDouble()),
+        text = formatVnd(amount),
         style = style,
         color = color,
         modifier = modifier
@@ -1272,23 +1331,8 @@ fun Modifier.springClickable(
     onClick: () -> Unit
 ): Modifier = composed {
     val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    val interactions = remember { mutableStateListOf<androidx.compose.foundation.interaction.Interaction>() }
-    LaunchedEffect(interactionSource) {
-        interactionSource.interactions.collect { interaction ->
-            when (interaction) {
-                is androidx.compose.foundation.interaction.PressInteraction.Press -> {
-                    interactions.add(interaction)
-                }
-                is androidx.compose.foundation.interaction.PressInteraction.Release -> {
-                    interactions.remove(interaction.press)
-                }
-                is androidx.compose.foundation.interaction.PressInteraction.Cancel -> {
-                    interactions.remove(interaction.press)
-                }
-            }
-        }
-    }
-    val isPressed = interactions.isNotEmpty()
+    val isPressed by interactionSource.collectIsPressedAsState()
+    
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.94f else 1f,
         animationSpec = spring(
