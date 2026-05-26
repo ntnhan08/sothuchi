@@ -9,11 +9,16 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -94,7 +99,7 @@ fun formatDate(timestamp: Long): String {
 fun BudgetApp() {
     val context = LocalContext.current
     val viewModel: FinanceViewModel = viewModel(
-        factory = FinanceViewModelFactory(context.applicationContext as Application)
+        factory = FinanceViewModelFactory(context)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -102,105 +107,119 @@ fun BudgetApp() {
     var showBudgetDialog by remember { mutableStateOf(false) }
     var selectedCategoryFilter by remember { mutableStateOf("Tất cả") }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    val activeParticles = remember { mutableStateListOf<Particle>() }
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val maxWidthPx = constraints.maxWidth.toFloat()
+        val maxHeightPx = constraints.maxHeight.toFloat()
+
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = MaterialTheme.colorScheme.background,
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier
+                        .testTag("add_transaction_fab")
+                        .padding(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Thêm Ghi Chép",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        ) { innerPadding ->
+            Column(
                 modifier = Modifier
-                    .testTag("add_transaction_fab")
-                    .padding(8.dp)
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 16.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Thêm Ghi Chép",
-                    modifier = Modifier.size(24.dp)
+                // Header Bar
+                HeaderSection()
+
+                // Main Financial Summary Card (Tiền Đang Có, Chi Tiêu, Còn Lại)
+                SummaryCardSection(
+                    uiState = uiState,
+                    onEditBudgetClicked = { showBudgetDialog = true }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Percentage spent visual track
+                SpentTrackerProgressSection(uiState = uiState)
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Title & Filter Label
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Lịch sử giao dịch",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "Lọc theo danh mục",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Filter tags
+                FilterChipsSection(
+                    selectedFilter = selectedCategoryFilter,
+                    onFilterSelected = { selectedCategoryFilter = it }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Transaction History list
+                TransactionsLedgerSection(
+                    uiState = uiState,
+                    selectedFilter = selectedCategoryFilter,
+                    onDeleteTransaction = { id -> viewModel.deleteTransaction(id) }
                 )
             }
         }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp)
-        ) {
-            // Header Bar
-            HeaderSection()
 
-            // Main Financial Summary Card (Tiền Đang Có, Chi Tiêu, Còn Lại)
-            SummaryCardSection(
-                uiState = uiState,
-                onEditBudgetClicked = { showBudgetDialog = true }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Percentage spent visual track
-            SpentTrackerProgressSection(uiState = uiState)
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Title & Filter Label
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Lịch sử giao dịch",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = "Lọc theo danh mục",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Filter tags
-            FilterChipsSection(
-                selectedFilter = selectedCategoryFilter,
-                onFilterSelected = { selectedCategoryFilter = it }
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Transaction History list
-            TransactionsLedgerSection(
-                uiState = uiState,
-                selectedFilter = selectedCategoryFilter,
-                onDeleteTransaction = { id -> viewModel.deleteTransaction(id) }
+        // Modal dialogs
+        if (showBudgetDialog) {
+            SetBudgetDialog(
+                currentBudget = uiState.budgetConfig.currentFunds,
+                onDismiss = { showBudgetDialog = false },
+                onConfirm = { amount ->
+                    viewModel.updateInitialBudget(amount)
+                    showBudgetDialog = false
+                    triggerPhysicsConfetti(activeParticles, maxWidthPx / 2f, maxHeightPx * 0.4f, false)
+                }
             )
         }
-    }
 
-    // Modal dialogs
-    if (showBudgetDialog) {
-        SetBudgetDialog(
-            currentBudget = uiState.budgetConfig.currentFunds,
-            onDismiss = { showBudgetDialog = false },
-            onConfirm = { amount ->
-                viewModel.updateInitialBudget(amount)
-                showBudgetDialog = false
-            }
-        )
-    }
+        if (showAddDialog) {
+            AddTransactionDialog(
+                onDismiss = { showAddDialog = false },
+                onConfirm = { title, amount, category, isExpense ->
+                    viewModel.addTransaction(title, amount, category, isExpense)
+                    showAddDialog = false
+                    triggerPhysicsConfetti(activeParticles, maxWidthPx / 2f, maxHeightPx * 0.7f, isExpense)
+                }
+            )
+        }
 
-    if (showAddDialog) {
-        AddTransactionDialog(
-            onDismiss = { showAddDialog = false },
-            onConfirm = { title, amount, category, isExpense ->
-                viewModel.addTransaction(title, amount, category, isExpense)
-                showAddDialog = false
-            }
-        )
+        // Animated physics confetti simulation overlay
+        if (activeParticles.isNotEmpty()) {
+            ConfettiOverlay(particles = activeParticles)
+        }
     }
 }
 
@@ -249,16 +268,37 @@ fun SummaryCardSection(
     uiState: FinanceUiState,
     onEditBudgetClicked: () -> Unit
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "SummaryCardPulse")
+    val animatedOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1200f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(12000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "gradientPulse"
+    )
+    val movingGradient = Brush.linearGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.08f),
+            MaterialTheme.colorScheme.secondary.copy(alpha = 0.16f)
+        ),
+        start = androidx.compose.ui.geometry.Offset(animatedOffset, 0f),
+        end = androidx.compose.ui.geometry.Offset(animatedOffset + 800f, 800f)
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onEditBudgetClicked() }
+            .springClickable { onEditBudgetClicked() }
+            .background(movingGradient, shape = RoundedCornerShape(24.dp))
             .testTag("budget_setting_card_button"),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = Color.Transparent
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column(
             modifier = Modifier.padding(20.dp)
@@ -275,19 +315,19 @@ fun SummaryCardSection(
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text(
-                        text = formatVnd(uiState.remainingBalance),
+                    AnimatedVndText(
+                        amount = uiState.remainingBalance,
                         style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (uiState.remainingBalance >= 0) {
-                                Color(0xFF10B981) // Mint Emerald
-                            } else {
-                                Color(0xFFEF4444) // Vibrant Alert Coral
-                            }
-                        )
+                            fontWeight = FontWeight.ExtraBold
+                        ),
+                        color = if (uiState.remainingBalance >= 0) {
+                            Color(0xFF10B981) // Mint Emerald
+                        } else {
+                            Color(0xFFEF4444) // Vibrant Alert Coral
+                        }
                     )
                 }
-
+ 
                 // Edit Button Icon
                 IconButton(
                     onClick = onEditBudgetClicked,
@@ -306,12 +346,12 @@ fun SummaryCardSection(
                     )
                 }
             }
-
+ 
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = 14.dp),
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
             )
-
+ 
             // Side by Side columns: Tiền Đang Có vs Tổng Chi Tiêu
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -337,13 +377,13 @@ fun SummaryCardSection(
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = formatVnd(uiState.budgetConfig.currentFunds),
+                    AnimatedVndText(
+                        amount = uiState.budgetConfig.currentFunds,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onBackground
                     )
                 }
-
+ 
                 // Separator Line
                 Box(
                     modifier = Modifier
@@ -352,9 +392,9 @@ fun SummaryCardSection(
                         .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                         .align(Alignment.CenterVertically)
                 )
-
+ 
                 Spacer(modifier = Modifier.width(16.dp))
-
+ 
                 // Tổng Chi Tiêu
                 Column(
                     modifier = Modifier.weight(1f),
@@ -375,11 +415,10 @@ fun SummaryCardSection(
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = formatVnd(uiState.totalExpenses),
+                    AnimatedVndText(
+                        amount = uiState.totalExpenses,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFF59E0B)
+                            fontWeight = FontWeight.Bold
                         ),
                         color = Color(0xFFF59E0B)
                     )
@@ -421,6 +460,14 @@ fun SpentTrackerProgressSection(uiState: FinanceUiState) {
         }
     } else {
         val pct = (uiState.totalExpenses / uiState.budgetConfig.currentFunds).coerceIn(0.0, 1.0)
+        val animatedPct by animateFloatAsState(
+            targetValue = pct.toFloat(),
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessLow
+            ),
+            label = "ProgressBarAnimation"
+        )
         val formattedPct = (pct * 100).toInt()
 
         val progressColor = when {
@@ -455,7 +502,7 @@ fun SpentTrackerProgressSection(uiState: FinanceUiState) {
             }
             Spacer(modifier = Modifier.height(4.dp))
             LinearProgressIndicator(
-                progress = { pct.toFloat() },
+                progress = { animatedPct },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp)
@@ -574,14 +621,32 @@ fun TransactionsLedgerSection(
             contentPadding = PaddingValues(top = 4.dp, bottom = 80.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            items(
+            itemsIndexed(
                 items = filteredTransactions,
-                key = { it.id }
-            ) { tx ->
-                TransactionRowItem(
-                    transaction = tx,
-                    onDelete = { onDeleteTransaction(tx.id) }
-                )
+                key = { _, tx -> tx.id }
+            ) { index, tx ->
+                var visible by remember { mutableStateOf(false) }
+                LaunchedEffect(tx.id) {
+                    kotlinx.coroutines.delay((index * 45L).coerceAtMost(350L))
+                    visible = true
+                }
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = slideInVertically(
+                        initialOffsetY = { 60 },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ) + fadeIn(animationSpec = tween(300)),
+                    exit = fadeOut(animationSpec = tween(200)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    TransactionRowItem(
+                        transaction = tx,
+                        onDelete = { onDeleteTransaction(tx.id) }
+                    )
+                }
             }
         }
     }
@@ -1028,4 +1093,164 @@ fun AddTransactionDialog(
         },
         shape = RoundedCornerShape(28.dp)
     )
+}
+
+// --- PREMIUM FLUTTER-STYLE ADDITIONS ---
+
+data class Particle(
+    val id: Int,
+    val x: Float,
+    val y: Float,
+    val vx: Float,
+    val vy: Float,
+    val color: Color,
+    val size: Float,
+    val alpha: Float,
+    val rotation: Float,
+    val rotSpeed: Float
+)
+
+@Composable
+fun ConfettiOverlay(particles: androidx.compose.runtime.snapshots.SnapshotStateList<Particle>) {
+    LaunchedEffect(particles.size) {
+        if (particles.isNotEmpty()) {
+            val gravity = 0.5f
+            while (particles.any { it.alpha > 0.05f }) {
+                withFrameMillis { _ ->
+                    for (i in particles.indices) {
+                        if (i < particles.size) {
+                            val p = particles[i]
+                            particles[i] = p.copy(
+                                x = p.x + p.vx,
+                                y = p.y + p.vy,
+                                vy = p.vy + gravity,
+                                alpha = (p.alpha - 0.02f).coerceAtLeast(0f),
+                                rotation = p.rotation + p.rotSpeed
+                            )
+                        }
+                    }
+                }
+            }
+            particles.clear()
+        }
+    }
+
+    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+        for (p in particles) {
+            if (p.alpha > 0f) {
+                rotate(p.rotation, pivot = androidx.compose.ui.geometry.Offset(p.x, p.y)) {
+                    drawRoundRect(
+                        color = p.color.copy(alpha = p.alpha),
+                        topLeft = androidx.compose.ui.geometry.Offset(p.x - p.size/2f, p.y - p.size/2f),
+                        size = androidx.compose.ui.geometry.Size(p.size, p.size),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
+                    )
+                }
+            }
+        }
+    }
+}
+
+fun triggerPhysicsConfetti(
+    particles: androidx.compose.runtime.snapshots.SnapshotStateList<Particle>,
+    startX: Float,
+    startY: Float,
+    isExpense: Boolean
+) {
+    particles.clear()
+    val colors = if (isExpense) {
+        listOf(
+            Color(0xFFEF4444), Color(0xFFF59E0B), Color(0xFFFF8A80), 
+            Color(0xFFFF5252), Color(0xFFFFB74D), Color(0xFFFF8F00)
+        )
+    } else {
+        listOf(
+            Color(0xFF10B981), Color(0xFF34D399), Color(0xFF6EE7B7), 
+            Color(0xFF64B5F6), Color(0xFF4FC3F7), Color(0xFF00E676)
+        )
+    }
+    
+    for (i in 0 until 45) {
+        val angle = Math.toRadians((210..330).random().toDouble())
+        val speed = (12..28).random().toFloat()
+        particles.add(
+            Particle(
+                id = i,
+                x = startX,
+                y = startY,
+                vx = (Math.cos(angle) * speed).toFloat(),
+                vy = (Math.sin(angle) * speed).toFloat(),
+                color = colors.random(),
+                size = (8..22).random().toFloat(),
+                alpha = 1.0f,
+                rotation = (0..360).random().toFloat(),
+                rotSpeed = ((-6..6).random() * 1.5f).toFloat()
+            )
+        )
+    }
+}
+
+@Composable
+fun AnimatedVndText(
+    amount: Double,
+    style: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified
+) {
+    val animatedAmount by animateFloatAsState(
+        targetValue = amount.toFloat(),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "VndAmountAnimation"
+    )
+    Text(
+        text = formatVnd(animatedAmount.toDouble()),
+        style = style,
+        color = color,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun Modifier.springClickable(
+    onClick: () -> Unit
+): Modifier {
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val interactions = remember { mutableStateListOf<androidx.compose.foundation.interaction.Interaction>() }
+    LaunchedEffect(interactionSource) {
+        interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is androidx.compose.foundation.interaction.PressInteraction.Press -> {
+                    interactions.add(interaction)
+                }
+                is androidx.compose.foundation.interaction.PressInteraction.Release -> {
+                    interactions.remove(interaction.press)
+                }
+                is androidx.compose.foundation.interaction.PressInteraction.Cancel -> {
+                    interactions.remove(interaction.press)
+                }
+            }
+        }
+    }
+    val isPressed = interactions.isNotEmpty()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.94f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "bounce"
+    )
+    return this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .clickable(
+            interactionSource = interactionSource,
+            indication = androidx.compose.foundation.LocalIndication.current,
+            onClick = onClick
+        )
 }

@@ -1,7 +1,6 @@
 package com.example.ui.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -22,13 +21,13 @@ data class FinanceUiState(
     val remainingBalance: Double = 0.0
 )
 
-class FinanceViewModel(application: Application) : AndroidViewModel(application) {
+class FinanceViewModel(context: Context) : ViewModel() {
     private val repository: FinanceRepository
 
     val uiState: StateFlow<FinanceUiState>
 
     init {
-        val database = AppDatabase.getDatabase(application)
+        val database = AppDatabase.getDatabase(context)
         val financeDao = database.financeDao()
         repository = FinanceRepository(financeDao)
 
@@ -77,11 +76,11 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
 }
 
-class FinanceViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
+class FinanceViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(FinanceViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return FinanceViewModel(application) as T
+            return FinanceViewModel(context.applicationContext) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

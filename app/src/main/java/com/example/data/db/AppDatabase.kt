@@ -21,9 +21,10 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "finance_database"
+                    "finance_tracker_db_v4"
                 )
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration(dropAllTables = true)
+                .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                 .build()
                 INSTANCE = instance
                 instance
