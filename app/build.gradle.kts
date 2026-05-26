@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -118,4 +120,26 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
+}
+
+val decodeDebugKeystoreTask = tasks.register("decodeDebugKeystore") {
+    val base64File = rootProject.file("debug.keystore.base64")
+    val keystoreFile = rootProject.file("debug.keystore")
+    onlyIf {
+        base64File.exists() && !keystoreFile.exists()
+    }
+    doLast {
+        try {
+            val base64Text = base64File.readText().trim()
+            val decodedBytes = Base64.getDecoder().decode(base64Text)
+            keystoreFile.writeBytes(decodedBytes)
+            logger.lifecycle("Successfully decoded debug.keystore from base64 representation.")
+        } catch (e: Exception) {
+            logger.warn("Could not decode debug.keystore: ${e.message}")
+        }
+    }
+}
+
+tasks.matching { it.name.contains("preBuild", ignoreCase = true) || it.name.contains("Signing", ignoreCase = true) }.configureEach {
+    dependsOn(decodeDebugKeystoreTask)
 }
