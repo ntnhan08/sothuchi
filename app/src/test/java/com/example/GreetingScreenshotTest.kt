@@ -34,7 +34,7 @@ class GreetingScreenshotTest {
         Scaffold { innerPadding ->
           Column(modifier = Modifier.padding(innerPadding).padding(horizontal = 16.dp)) {
             HeaderSection()
-            SummaryCardSection(
+            LuxurySummaryCard(
               uiState = FinanceUiState(
                 transactions = listOf(
                   Transaction(id = 1, title = "Ăn trưa", amount = 35000.0, category = "Ăn uống"),
@@ -46,7 +46,7 @@ class GreetingScreenshotTest {
               ),
               onEditBudgetClicked = {}
             )
-            SpentTrackerProgressSection(
+            BudgetTrackerVisuals(
               uiState = FinanceUiState(
                 transactions = emptyList(),
                 budgetConfig = BudgetConfig(currentFunds = 500000.0),

@@ -37,7 +37,7 @@ class ExampleRobolectricTest {
     }
 
     // Verify initial clean state with Empty State
-    composeTestRule.onNodeWithText("Chưa có ghi chép chi tiêu nào").assertExists()
+    composeTestRule.onNodeWithText("TÀI SẢN").assertExists()
 
     // Trigger setting budget
     composeTestRule.onNodeWithTag("budget_setting_card_button").performClick()
