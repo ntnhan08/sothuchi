@@ -32,6 +32,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -130,17 +131,29 @@ fun BudgetApp() {
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MatteGold,
-                contentColor = RichBlack,
-                modifier = Modifier.testTag("add_transaction_fab").padding(8.dp)
+            var isFabVisible by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                kotlinx.coroutines.delay(300)
+                isFabVisible = true
+            }
+            AnimatedVisibility(
+                visible = isFabVisible,
+                enter = scaleIn(animationSpec = tween(500, easing = EaseOutBack)) + fadeIn(animationSpec = tween(500))
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Thêm Ghi Chép",
-                    modifier = Modifier.size(28.dp)
-                )
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    containerColor = MatteGold,
+                    contentColor = RichBlack,
+                    modifier = Modifier
+                        .testTag("add_transaction_fab")
+                        .padding(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Thêm Ghi Chép",
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
         }
     ) { innerPadding ->
@@ -222,18 +235,20 @@ fun BudgetApp() {
                         }
                     }
                 } else {
-                    itemsIndexed(
+                    items(
                         items = filteredTransactions,
-                        key = { _, tx -> tx.id }
-                    ) { _, tx ->
-                        TransactionRowItem(
-                            transaction = tx,
-                            onDelete = { viewModel.deleteTransaction(tx.id) }
-                        )
+                        key = { it.id }
+                    ) { tx ->
+                        Box(modifier = Modifier.animateItem()) {
+                            TransactionRowItem(
+                                transaction = tx,
+                                onDelete = { viewModel.deleteTransaction(tx.id) }
+                            )
+                        }
                     }
                 }
-            }
-        }
+        } // Closes LazyColumn
+    } // Closes Scaffold content block
 
     if (showBudgetDialog) {
         SetBudgetDialog(
@@ -259,44 +274,56 @@ fun BudgetApp() {
 
 
 
+
+
 @Composable
 fun HeaderSection() {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    var isVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
+
+    AnimatedVisibility(
+        visible = isVisible,
+        enter = slideInVertically(initialOffsetY = { -50 }, animationSpec = tween(700, easing = EaseOutCubic)) + fadeIn(animationSpec = tween(700))
     ) {
-        Column {
-            Text(
-                text = "TÀI SẢN",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                ),
-                color = MatteGold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Quản lý chi tiêu",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Black
-                ),
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        }
-        Surface(
-            modifier = Modifier.size(48.dp),
-            shape = CircleShape,
-            color = CharcoalGray,
-            border = BorderStroke(1.dp, MatteGold.copy(alpha = 0.3f))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Diamond,
-                    contentDescription = "Premium",
-                    tint = MatteGold,
-                    modifier = Modifier.size(24.dp)
+            Column {
+                Text(
+                    text = "TÀI SẢN",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp
+                    ),
+                    color = MatteGold
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Quản lý chi tiêu",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Black
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = CharcoalGray,
+                border = BorderStroke(1.dp, MatteGold.copy(alpha = 0.3f))
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Diamond,
+                        contentDescription = "Premium",
+                        tint = MatteGold,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
     }
@@ -356,12 +383,17 @@ fun LuxurySummaryCard(
             }
             Spacer(modifier = Modifier.height(8.dp))
             
+            val animatedBalance by animateFloatAsState(
+                targetValue = uiState.remainingBalance.toFloat(),
+                animationSpec = tween(1000, easing = EaseOutCubic),
+                label = "balance"
+            )
             Text(
-                text = formatVnd(uiState.remainingBalance),
+                text = formatVnd(animatedBalance.toDouble()),
                 style = MaterialTheme.typography.displaySmall.copy(
                     fontWeight = FontWeight.Black
                 ),
-                color = if (uiState.remainingBalance >= 0) MaterialTheme.colorScheme.onBackground else Color(0xFFEF4444)
+                color = if (animatedBalance >= 0) MaterialTheme.colorScheme.onBackground else Color(0xFFEF4444)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -386,8 +418,13 @@ fun LuxurySummaryCard(
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
+                    val animatedFunds by animateFloatAsState(
+                        targetValue = uiState.totalFunds.toFloat(),
+                        animationSpec = tween(1000, easing = EaseOutCubic),
+                        label = "funds"
+                    )
                     Text(
-                        text = formatVnd(uiState.totalFunds),
+                        text = formatVnd(animatedFunds.toDouble()),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = Color(0xFF81C995)
                     )
@@ -417,8 +454,13 @@ fun LuxurySummaryCard(
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
+                    val animatedExpenses by animateFloatAsState(
+                        targetValue = uiState.totalExpenses.toFloat(),
+                        animationSpec = tween(1000, easing = EaseOutCubic),
+                        label = "expenses"
+                    )
                     Text(
-                        text = formatVnd(uiState.totalExpenses),
+                        text = formatVnd(animatedExpenses.toDouble()),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = Color(0xFFF28B82)
                     )
@@ -562,6 +604,7 @@ fun FilterChipsSection(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionRowItem(
     transaction: Transaction,
@@ -570,79 +613,107 @@ fun TransactionRowItem(
     val categoryUi = categories.firstOrNull { it.name == transaction.category }
         ?: CategoryUi("Khác", Icons.Default.Category, Platinum)
 
-    Card(
-        modifier = Modifier.fillMaxWidth().testTag("transaction_item_${transaction.id}"),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = CharcoalGray.copy(alpha = 0.4f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f))
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                modifier = Modifier.size(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = categoryUi.color.copy(alpha = 0.15f)
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { dismissValue ->
+            if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
+                onDelete()
+                true
+            } else false
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            val color by animateColorAsState(
+                targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart) Color(0xFFF28B82) else Color(0xFFF28B82).copy(alpha = 0.5f),
+                label = "dismiss_color"
+            )
+            val scale by animateFloatAsState(
+                targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart) 1.2f else 1f,
+                label = "dismiss_scale"
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(vertical = 4.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(color)
+                    .padding(end = 24.dp),
+                contentAlignment = Alignment.CenterEnd
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = categoryUi.icon,
-                        contentDescription = transaction.category,
-                        tint = categoryUi.color,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = transaction.title,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = Color.White,
+                    modifier = Modifier.scale(scale)
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = transaction.category,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = categoryUi.color.copy(alpha = 0.8f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier.size(4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = formatDate(transaction.timestamp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                    )
-                }
             }
+        }
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("transaction_item_${transaction.id}"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = CharcoalGray.copy(alpha = 0.4f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f))
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = categoryUi.color.copy(alpha = 0.15f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = categoryUi.icon,
+                            contentDescription = transaction.category,
+                            tint = categoryUi.color,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
 
-            Column(horizontalAlignment = Alignment.End) {
-                val isExp = transaction.isExpense
-                Text(
-                    text = if (isExp) "-${formatVnd(transaction.amount)}" else "+${formatVnd(transaction.amount)}",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
-                    color = if (isExp) Color(0xFFF28B82) else Color(0xFF81C995)
-                )
-                
-                var showConfirm by remember { mutableStateOf(false) }
-                
-                if (showConfirm) {
-                    IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Check, contentDescription = "Xác nhận", tint = Color(0xFFF28B82))
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = transaction.title,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = transaction.category,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = categoryUi.color.copy(alpha = 0.8f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier.size(4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = formatDate(transaction.timestamp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                        )
                     }
-                } else {
-                    IconButton(onClick = { showConfirm = true }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "Xoá", tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
-                    }
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    val isExp = transaction.isExpense
+                    Text(
+                        text = if (isExp) "-${formatVnd(transaction.amount)}" else "+${formatVnd(transaction.amount)}",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                        color = if (isExp) Color(0xFFF28B82) else Color(0xFF81C995)
+                    )
                 }
             }
         }
@@ -772,15 +843,18 @@ fun AddTransactionDialog(
                 ) {
                     categories.forEach { category ->
                         val isSelected = category.name == selectedCategory
+                        val bgColor by animateColorAsState(targetValue = if (isSelected) category.color else CharcoalGray, animationSpec = tween(300), label = "chip_bg")
+                        val textColor by animateColorAsState(targetValue = if (isSelected) RichBlack else MaterialTheme.colorScheme.onBackground, animationSpec = tween(300), label = "chip_text")
+                        
                         Surface(
                             modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable { selectedCategory = category.name },
-                            color = if (isSelected) category.color else CharcoalGray,
+                            color = bgColor,
                             border = if (!isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.onBackground.copy(alpha=0.2f)) else null
                         ) {
                             Text(
                                 text = category.name,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                color = if (isSelected) RichBlack else MaterialTheme.colorScheme.onBackground
+                                color = textColor
                             )
                         }
                     }
